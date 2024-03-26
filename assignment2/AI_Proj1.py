@@ -19,7 +19,7 @@ Y_COORDINATE_SHIFT = [0, 1, -1, 0]
 
 ALPHA = 0.02 # avoid alpha > 11 for 35x35
 FQ_THRESHOLD = 0.05
-INITIAL_BEEP_COUNT = 108
+INITIAL_BEEP_COUNT = 81
 
 LOG_NONE = 0
 LOG_INFO = 1
@@ -306,6 +306,8 @@ class Bot_1(ParentBot):
         min_prob = 0 if (observed_fq - threshold < 0) else (observed_fq - threshold)
         max_prob = 1 if (observed_fq + threshold > 1) else (observed_fq + threshold)
         pred_crew_cells = []
+        all_probs = set()
+        pred_crew_cells_2 = [] #take first few cells (what is few??)
         is_recalc_cell_prob = False
 
         # reason for having 2 prob cells is because the cell with the highest prob can be the adjacent cell and this can be ignored if no beep was recieved
@@ -356,7 +358,11 @@ class Bot_1(ParentBot):
             is_removed = False
             # not good cause better to towards the cell with the prob of a crew in it???
             if (cell.probs.beep_given_crew >= min_prob and cell.probs.beep_given_crew <= max_prob):
-                pred_crew_cells.append(cell_cord) # move to all cells we have deemed worthy :p
+                # pred_crew_cells.append(cell_cord)
+                pred_crew_cells.append((cell_cord, cell.probs.crew_given_beep)) # move to all cells we have deemed worthy :p
+
+            if cell.probs.crew_given_beep not in all_probs:
+                all_probs.add(cell.probs.crew_given_beep)
 
             # if not (cell.probs.crew_prob):
             #     self.logger.print_cell_data(LOG_NONE, cell, self.curr_pos)
@@ -370,7 +376,15 @@ class Bot_1(ParentBot):
             self.logger.print_cell_data(LOG_DEBUG, cell, self.curr_pos)
 
         if self.recalc_pred_cells and not(is_move_bot):
-            self.pred_crew_cells = list(pred_crew_cells)
+            # self.pred_crew_cells = list(pred_crew_cells)
+            # pred_crew_cells = sorted(pred_crew_cells, key=lambda crew_prob : crew_prob[1], reverse = True) # could make this slower "potentitally??"
+            all_probs = sorted(all_probs, reverse=True)
+            self.pred_crew_cells = list()
+            for cell in pred_crew_cells:
+                max_range = 5 if len(all_probs) > 5 else len(all_probs)
+                for i in range(max_range):
+                    if cell[1] == all_probs[i]:
+                        self.pred_crew_cells.append(cell[0])
 
         self.crew_probs.beep_prob = beep_prob
         self.crew_probs.no_beep_prob = no_beep_prob
