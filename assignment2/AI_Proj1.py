@@ -19,7 +19,7 @@ Y_COORDINATE_SHIFT = [0, 1, -1, 0]
 
 ALPHA = 0.02 # avoid alpha > 11 for 35x35
 FQ_THRESHOLD = 0.05
-INITIAL_BEEP_COUNT = 81
+INITIAL_BEEP_COUNT = 108
 
 LOG_NONE = 0
 LOG_INFO = 1
@@ -53,7 +53,7 @@ def print_my_grid(grid):
     print("****************")
     for i, cells in enumerate(grid):
         for j, cell in enumerate(cells):
-            print(f"{cell.cell_type}", end = " ")
+            print(f"{i}{j}::{cell.cell_type}", end = " ")
         print("")
     print("****************")
 
@@ -203,6 +203,7 @@ class Ship:
         for i, cells in enumerate(self.grid):
             for j, cell in enumerate(cells):
                 if cell.cord != self.bot and cell.cord != self.crew and cell.cell_type != CLOSED_CELL:
+                    cell.cell_type = OPEN_CELL
                     self.open_cells.append((i, j))
 
                 if cell.cell_type & (OPEN_CELL | BOT_CELL | CREW_CELL):
