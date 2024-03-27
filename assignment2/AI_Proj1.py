@@ -9,6 +9,7 @@ CLOSED_CELL = 1
 OPEN_CELL = 2
 BOT_CELL = 4
 CREW_CELL = 8
+ALIEN_CELL = 16
 GRID_SIZE = 35
 
 TOTAL_ITERATIONS = 10000
@@ -17,6 +18,7 @@ MAX_ALPHA_ITERATIONS = 10
 X_COORDINATE_SHIFT = [1, 0, 0, -1]
 Y_COORDINATE_SHIFT = [0, 1, -1, 0]
 
+ALIEN_ZONE_SIZE = 3 # k - k >= 1, need to determine the large value
 ALPHA = 0.02 # avoid alpha > 11 for 35x35
 FQ_THRESHOLD = 0.05
 INITIAL_BEEP_COUNT = 108
@@ -112,6 +114,7 @@ class Cell:
         self.cord = (row, col)
         self.crew_distance = 0
         self.prob_hearing_beep = 0
+        self.within_detection_zone = False
 
 
 class Ship:
@@ -123,6 +126,7 @@ class Ship:
         self.isBeep = 0
         self.bot = (0, 0)
         self.crew = (0, 0)
+        self.alien = (0, 0)
 
         #closed grid formation...
         self.generate_grid()
@@ -147,8 +151,7 @@ class Ship:
         return changed
 
     def mark_random_cell(self):
-        rows = len(self.grid)
-        cols = len(self.grid[0])
+        rows = cols = self.size
         random_row = randint(0, rows - 1)
         random_col = randint(0, cols - 1)
         self.grid[random_row][random_col].cell_type = CLOSED_CELL
@@ -175,6 +178,8 @@ class Ship:
         self.grid[self.bot[0]][self.bot[1]].cell_type = BOT_CELL
         self.grid[self.crew[0]][self.crew[1]].cell_type = CREW_CELL
 
+        self.place_aliens()
+
     def set_cell_details(self, reset = False):
         for i, cells in enumerate(self.grid):
             for j, cell in enumerate(cells):
@@ -192,6 +197,49 @@ class Ship:
         if self.isBeep <= self.grid[cell[0]][cell[1]].prob_hearing_beep:
             return True
         return False
+    
+    def place_aliens(self):
+        # print('Bot cell: ', self.bot)
+        cells_within_zone = self.get_detection_zone(self.bot)
+
+        while(True):
+            self.alien = (randint(0, self.size -1), randint(0, self.size -1))
+            if ((self.alien not in cells_within_zone) and
+                ((self.grid[self.alien[0]][self.alien[1]]).cell_type & OPEN_CELL)):
+                break
+
+        # print('Alien cell: ', self.alien)
+        self.grid[self.alien[0]][self.alien[1]].cell_type = ALIEN_CELL
+
+    
+    def get_detection_zone(self, cell):
+        k = ALIEN_ZONE_SIZE
+
+        cells_within_zone = []
+        min_row = max(0, cell[0] - k)
+        max_row = min(self.size - 1, cell[0] + k)
+        min_col = max(0, cell[1] - k)
+        max_col = min(self.size - 1, cell[1] + k)
+
+        for row in range(min_row, max_row + 1):
+            for col in range(min_col, max_col + 1):
+                cell = self.grid[row][col]
+                cell.within_detection_zone = True
+                cells_within_zone.append((row, col))
+        
+        # print('Cells within zone: ', cells_within_zone)
+
+        return cells_within_zone
+    
+    def reset_detection_zone(self, curr_cell):
+        cells_within_zone = self.get_detection_zone(curr_cell)
+        
+        # Reset cells outside detection zone to false
+        for i, cells in enumerate(self.grid):
+            for j, cell in enumerate(cells):
+                if cell not in cells_within_zone: cell.within_detection_zone = False
+
+        return cells_within_zone
 
     def reset_grid(self):
         self.open_cells = []
@@ -439,10 +487,11 @@ def run_test(log_level = LOG_INFO):
     update_lookup(ALPHA)
     ship = Ship(GRID_SIZE)
     ship.place_players()
+    print_my_grid(ship.grid)
     use_version = 1
-    bot_1 = Bot_1(ship, log_level)
-    bot_1.start_rescue()
-    del bot_1
+    # bot_1 = Bot_1(ship, log_level)
+    # bot_1.start_rescue()
+    # del bot_1
     del ship
 
 def run_sim(my_range, queue, alpha):
@@ -522,6 +571,6 @@ def compare_multiple_alpha():
         print(key, value)
 
 if __name__ == '__main__':
-    # run_test()
-    run_multi_sim(ALPHA, True)
+    run_test()
+    # run_multi_sim(ALPHA, True)
     # compare_multiple_alpha()
