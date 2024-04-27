@@ -14,7 +14,7 @@ CREW_CELL = 8
 BOT_CELL = 16
 
 # layout constantss
-GRID_SIZE = 5
+GRID_SIZE = 7
 SUCCESS = 1
 FAILURE = 0
 CONV_ITERATIONS_LIMIT = 1000
@@ -418,6 +418,7 @@ class PARENT_BOT:
         self.csv_data = None
         self.local_all_moves = list(ALL_BOT_MOVES)
         self.local_all_moves.insert(0, (0,0))
+        self.init_plots = False
 
     def move_bot(self):
         return
@@ -425,7 +426,7 @@ class PARENT_BOT:
     def move_crew(self):
         return bool(True)
 
-    def visualize_grid(self):
+    def visualize_grid(self, is_end = True):
         if not VISUALIZE:
             return
 
@@ -437,9 +438,17 @@ class PARENT_BOT:
 
             data.append(inner_list)
         from matplotlib import pyplot
-        fig, ax = pyplot.subplots()
-        ax.matshow(data, cmap='seismic')
-        pyplot.show()
+        if not self.init_plots:
+            self.fig, self.ax = pyplot.subplots()
+            self.image = pyplot.imshow(data, cmap='seismic')
+            self.init_plots = True
+
+        self.image.set_data(data)
+        self.fig.canvas.draw_idle()
+        pyplot.pause(1e-3)
+
+        if is_end:
+            pyplot.close(self.fig)
 
     def append_move(self):
         if self.csv_data is None:
@@ -468,7 +477,7 @@ class PARENT_BOT:
             return self.total_moves, SUCCESS
 
         while(True):
-            self.visualize_grid()
+            self.visualize_grid(False)
             self.total_moves += 1
 
             self.move_bot()

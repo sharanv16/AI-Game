@@ -6,9 +6,8 @@ from time import time
 import numpy as np
 import random
 
-# TOTAL_ITERS = 15000
-MAX_TEST = 10000
-MAX_TRAIN = 10000
+MAX_TEST = 100
+MAX_TRAIN = 100
 
 FULL_GRID_STATE = AI_Proj3.GRID_SIZE**2
 H_LAYER_1 = 150
@@ -27,14 +26,6 @@ ACTIONS_ID = {
 "SOUTH_EAST" : int(4),
 "SOUTH_WEST" : int(6)
 }
-
-# REWARDS = {
-#     AI_Proj3.CLOSED_CELL : 16,
-#     AI_Proj3.TELEPORT_CELL : 1,
-#     AI_Proj3.OPEN_CELL : 1,
-#     AI_Proj3.CREW_CELL : 16,
-#     AI_Proj3.BOT_CELL : 1
-# }
 
 class QModel(nn.Module):
   def __init__(self):
@@ -115,25 +106,26 @@ class Q_BOT(AI_Proj3.BOT_CONFIG):
         self.state_2 = self.get_curr_state()
         self.tensor_2 = torch.from_numpy(self.state_2).float()
         reward = self.ship.time_lookup[bot_pos[0]][bot_pos[1]][crew_pos[0]][crew_pos[1]]
-        # if self.action_result & (AI_Proj3.CLOSED_CELL | AI_Proj3.CREW_CELL | AI_Proj3.TELEPORT_CELL):
-        #     reward = 16
+        # if self.action_result & (AI_Proj3.CLOSED_CELL | AI_Proj3.CREW_CELL):
+        #     reward *= 2
         # elif self.local_crew_pos == self.ship.teleport_cell:
         #     reward = 0
         # else:
         #     reward = 1
 
-        possibleQs = self.ship.q_model(self.tensor_2)
+        with torch.no_grad():
+            possibleQs = self.ship.q_model(self.tensor_2)
+
         maxQ = torch.max(possibleQs)
         newQ = (GAAMA*maxQ - reward) if (self.local_crew_pos != self.ship.teleport_cell) else 0
-        # newQ -= 1
         self.policy_reward = torch.Tensor([newQ]).detach()
         return self.ship.loss_fn(self.policy_action, self.policy_reward)
 
     def process_q_learn(self):
         self.tensor_1 = torch.from_numpy(self.state_1).float()
         q_vals = self.ship.q_model(self.tensor_1)
-        if self.total_moves % 2 == 0:
-        # if False:
+        # if self.total_moves % 2 == 0:
+        if False:
             self.best_move = self.ship.best_policy_lookup[self.local_bot_pos][self.local_crew_pos][AI_Proj3.BEST_MOVE]
             action_no = self.ship.get_action(self.local_bot_pos, self.best_move)
             self.make_bot_move(self.best_move)
@@ -183,10 +175,13 @@ class Q_BOT(AI_Proj3.BOT_CONFIG):
 
         while(True):
             self.total_moves += 1
+            self.visualize_grid(False)
             if self.process_q_learn():
+                self.visualize_grid()
                 return self.total_moves, AI_Proj3.SUCCESS
 
             if self.total_moves > 10000:
+                self.visualize_grid()
                 return self.total_moves, AI_Proj3.FAILURE
 
     def test_rescue(self):
@@ -232,17 +227,13 @@ def single_sim(ship):
         AI_Proj3.print_data(final_data, itr, MAX_TRAIN)
 
 def single_run():
-    begin = time()
     ship = LEARN_CONFIG()
     ship.perform_initial_calcs()
-    # print(time() - begin)
     t_bot(ship)
     ship.print_losses()
     t_bot(ship, False)
     ship.print_losses()
     single_sim(ship)
-    # test_bot()
-
 
 if __name__ == '__main__':
     begin = time()
