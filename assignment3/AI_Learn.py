@@ -6,14 +6,15 @@ from time import time
 import numpy as np
 import random
 
-MAX_TEST = 100
-MAX_TRAIN = 100
+MAX_TEST = 1000
+MAX_TRAIN = 1000
 
 FULL_GRID_STATE = AI_Proj3.GRID_SIZE**2
-H_LAYER_1 = 150
-H_LAYER_2 = 100
+H_LAYER_1 = 100
+H_LAYER_2 = 50
+H_LAYER_3 = 25
 BOT_ACTIONS = 9
-GAAMA = 0.7
+GAAMA = 1.0
 
 ACTIONS_ID = {
 "IDLE" : int(0),
@@ -30,16 +31,20 @@ ACTIONS_ID = {
 class QModel(nn.Module):
   def __init__(self):
     super(QModel, self).__init__()
-    self.input_layer = torch.nn.Linear( in_features = FULL_GRID_STATE, out_features = H_LAYER_1, bias=True )
-    self.layer_1 = torch.nn.Linear( in_features = H_LAYER_1, out_features = H_LAYER_2, bias = True )
-    self.layer_2 = torch.nn.Linear( in_features = H_LAYER_2, out_features = BOT_ACTIONS, bias = True)
+    self.input_layer = torch.nn.Linear( in_features = FULL_GRID_STATE, out_features = H_LAYER_2, bias=True )
+    # self.input_layer = torch.nn.Linear( in_features = FULL_GRID_STATE, out_features = H_LAYER_1, bias=True )
+    # self.layer_1 = torch.nn.Linear( in_features = H_LAYER_1, out_features = H_LAYER_2, bias = True )
+    self.layer_2 = torch.nn.Linear( in_features = H_LAYER_2, out_features = H_LAYER_3, bias = True)
+    self.layer_3 = torch.nn.Linear( in_features = H_LAYER_3, out_features = BOT_ACTIONS, bias = True)
 
   def forward(self, input_tensor):
     output = self.input_layer(input_tensor)
     output = nn.ReLU()(output)
-    output = self.layer_1(output)
-    output = nn.ReLU()(output)
+    # output = self.layer_1(output)
+    # output = nn.ReLU()(output)
     output = self.layer_2(output)
+    output = nn.ReLU()(output)
+    output = self.layer_3(output)
     return output
 
 class LEARN_CONFIG(AI_Proj3.SHIP):
@@ -47,15 +52,16 @@ class LEARN_CONFIG(AI_Proj3.SHIP):
         super(LEARN_CONFIG, self).__init__()
         self.q_model = QModel()
         self.optimizer = torch.optim.Adam(self.q_model.parameters(), lr=AI_Proj3.CONVERGENCE_LIMIT)
-        self.loss_fn = torch.nn.MSELoss()
+        self.loss_fn = torch.nn.L1Loss()
+        # self.loss_fn = torch.nn.CrossEntropyLoss()
         self.losses = []
 
     def print_losses(self):
-        # plt.figure(figsize=(10,7))
-        # plt.plot(self.losses)
-        # plt.xlabel("Epochs",fontsize=22)
-        # plt.ylabel("Loss",fontsize=22)
-        # plt.show()
+        plt.figure(figsize=(10,7))
+        plt.plot(self.losses)
+        plt.xlabel("Epochs",fontsize=22)
+        plt.ylabel("Loss",fontsize=22)
+        plt.show()
         self.losses.clear()
 
     def get_action(self, bot_cell, bot_move, is_parse = False):
@@ -117,7 +123,7 @@ class Q_BOT(AI_Proj3.BOT_CONFIG):
             possibleQs = self.ship.q_model(self.tensor_2)
 
         maxQ = torch.max(possibleQs)
-        newQ = (GAAMA*maxQ - reward) if (self.local_crew_pos != self.ship.teleport_cell) else 0
+        newQ = (GAAMA*maxQ - self.total_moves) if (self.local_crew_pos != self.ship.teleport_cell) else 0
         self.policy_reward = torch.Tensor([newQ]).detach()
         return self.ship.loss_fn(self.policy_action, self.policy_reward)
 
@@ -125,27 +131,30 @@ class Q_BOT(AI_Proj3.BOT_CONFIG):
         self.tensor_1 = torch.from_numpy(self.state_1).float()
         q_vals = self.ship.q_model(self.tensor_1)
         # if self.total_moves % 2 == 0:
-        if False:
-            self.best_move = self.ship.best_policy_lookup[self.local_bot_pos][self.local_crew_pos][AI_Proj3.BEST_MOVE]
-            action_no = self.ship.get_action(self.local_bot_pos, self.best_move)
-            self.make_bot_move(self.best_move)
-            self.action_result = self.ship.get_state(self.best_move)
+        # if False:
+        self.best_move = self.ship.best_policy_lookup[self.local_bot_pos][self.local_crew_pos][AI_Proj3.BEST_MOVE]
+        best_action = self.ship.get_action(self.local_bot_pos, self.best_move)
+        # self.make_bot_move(self.best_move)
+        # self.action_result = self.ship.get_state(self.best_move)
+        # else:
+        if random.uniform(0, 1) < self.epsilon:
+            action_no = np.random.randint(0,9)
         else:
-            if random.uniform(0, 1) < self.epsilon:
-                action_no = np.random.randint(0,9)
-            else:
-                action_no = np.argmax(q_vals.data.numpy())
+            action_no = np.argmax(q_vals.data.numpy())
 
-            self.make_action(action_no)
+        self.make_action(action_no)
+        # print(q_vals, best_action)
 
+        loss = self.ship.loss_fn(q_vals.squeeze()[action_no], q_vals.squeeze()[best_action])
         is_rescued = self.move_crew()
-        self.policy_action = q_vals.squeeze()[action_no]
-        loss = self.get_loss()
+        # self.policy_action = q_vals.squeeze()[action_no]
+        # loss = self.get_loss()
         self.ship.optimizer.zero_grad()
         loss.backward()
         self.ship.losses.append(loss.item())
         self.ship.optimizer.step()
-        self.state_1 = self.state_2
+        self.state_1 = self.get_curr_state()
+        # self.state_1 = self.state_2
         return is_rescued
 
     def move_bot(self):

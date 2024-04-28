@@ -454,6 +454,9 @@ class PARENT_BOT:
         if self.csv_data is None:
             return
 
+        if self.local_crew_pos == self.ship.teleport_cell:
+            return
+
         policies = self.ship.best_policy_lookup[self.local_bot_pos][self.local_crew_pos]
         curr_layout = [[self.ship.get_state((i, j)) for j in range(self.ship.size)] for i in range(self.ship.size)]
         final_policy = []
@@ -480,12 +483,15 @@ class PARENT_BOT:
             self.visualize_grid(False)
             self.total_moves += 1
 
+            self.append_move()
             self.move_bot()
             if self.move_crew():
+                self.append_move()
                 self.visualize_grid()
                 return self.total_moves, SUCCESS
 
             if self.total_moves > 10000:
+                self.append_move()
                 self.visualize_grid()
                 return self.total_moves, FAILURE
 
@@ -755,7 +761,7 @@ def generate_same_data(args):
 
 def get_single_data():
     core_count = MAX_CORES
-    total_data = 1000
+    total_data = 10000
     thread_data = ceil(total_data/core_count)
     ship = SHIP()
     ship.perform_initial_calcs()
@@ -778,10 +784,10 @@ def get_single_data():
 
 if __name__ == '__main__':
     begin = time()
-    single_run()
+    # single_run()
     # single_sim(1000)
     # run_multi_sim()
-    # get_single_data()
+    get_single_data()
     # get_generalized_data()
     end = time()
     print(end-begin)
