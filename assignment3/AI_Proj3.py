@@ -7,7 +7,7 @@ import csv
 import os
 
 # cell constants
-CLOSED_CELL = 1
+CLOSED_CELL = 0
 TELEPORT_CELL = 2
 OPEN_CELL = 4
 CREW_CELL = 8
